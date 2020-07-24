@@ -5,7 +5,6 @@ from pypi_org.data.modelbase import SqlAlchemyBase
 
 factory = None
 
-
 def global_init(db_file: str):
     global factory
 

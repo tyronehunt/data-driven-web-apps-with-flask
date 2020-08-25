@@ -4,7 +4,8 @@ import sys
 import time
 from typing import List, Optional, Dict
 
-import progressbar
+# Progressbar doesn't work
+# import progressbar
 from dateutil.parser import parse
 
 # Adds the directory (two above this file - i.e. starter) to the system path for access outside of PyCharm
@@ -47,61 +48,66 @@ def main():
 def do_import_languages(file_data: List[dict]):
     imported = set()
     print("Importing languages ... ", flush=True)
-    with progressbar(max_value=len(file_data)) as bar:
-        for idx, p in enumerate(file_data):
-            info = p.get('info')
-            classifiers = info.get('classifiers')
-            for c in classifiers:
-                if 'Programming Language' not in c:
-                    continue
+    # with progressbar(max_value=len(file_data)) as bar:
+    bar = 0
+    for idx, p in enumerate(file_data):
+        info = p.get('info')
+        classifiers = info.get('classifiers')
+        for c in classifiers:
+            if 'Programming Language' not in c:
+                continue
 
-                original = c
+            original = c
 
-                c = c.replace('Implementation ::', '').replace('::', ':')
-                text = c
-                parts = c.split(':')
-                if len(parts) > 1:
-                    text = ' '.join(parts[-2:]).strip().replace('  ', ' ')
+            c = c.replace('Implementation ::', '').replace('::', ':')
+            text = c
+            parts = c.split(':')
+            if len(parts) > 1:
+                text = ' '.join(parts[-2:]).strip().replace('  ', ' ')
 
-                if text not in imported:
-                    imported.add(text)
-                    session = db_session.create_session()
+            if text not in imported:
+                imported.add(text)
+                session = db_session.create_session()
 
-                    lang = ProgrammingLanguage()
-                    lang.description = original
-                    lang.id = text
-                    session.add(lang)
-                    session.commit()
+                lang = ProgrammingLanguage()
+                lang.description = original
+                lang.id = text
+                session.add(lang)
+                session.commit()
+        # bar.update(idx)
+        bar += 1
 
-            bar.update(idx)
-
-    sys.stderr.flush()
-    sys.stdout.flush()
+    print(bar)
+    # sys.stderr.flush()
+    # sys.stdout.flush()
 
 
 def do_import_licenses(file_data: List[dict]):
     imported = set()
     print("Importing licenses ... ", flush=True)
-    with progressbar(max_value=len(file_data)) as bar:
-        for idx, p in enumerate(file_data):
-            info = p.get('info')
-            license_text = detect_license(info.get('license'))
+    # with progressbar(max_value=len(file_data)) as bar:
+    bar = 0
+    for idx, p in enumerate(file_data):
+        info = p.get('info')
+        license_text = detect_license(info.get('license'))
 
-            if license_text and license_text not in imported:
-                imported.add(license_text)
-                session = db_session.create_session()
+        if license_text and license_text not in imported:
+            imported.add(license_text)
+            session = db_session.create_session()
 
-                package_license = License()
-                package_license.id = license_text
-                package_license.description = info.get('license')
+            package_license = License()
+            package_license.id = license_text
+            package_license.description = info.get('license')
 
-                session.add(package_license)
-                session.commit()
+            session.add(package_license)
+            session.commit()
 
-            bar.update(idx)
+        # bar.update(idx)
+        bar += 1
 
-    sys.stderr.flush()
-    sys.stdout.flush()
+    print(bar)
+    # sys.stderr.flush()
+    # sys.stdout.flush()
 
 
 def do_summary():
@@ -118,22 +124,25 @@ def do_summary():
 
 def do_user_import(user_lookup: Dict[str, str]) -> Dict[str, User]:
     print("Importing users ... ", flush=True)
-    with progressbar(max_value=len(user_lookup)) as bar:
-        for idx, (email, name) in enumerate(user_lookup.items()):
-            session = db_session.create_session()
-            session.expire_on_commit = False
+    # with progressbar(max_value=len(user_lookup)) as bar:
+    bar = 0
+    for idx, (email, name) in enumerate(user_lookup.items()):
+        session = db_session.create_session()
+        session.expire_on_commit = False
 
-            user = User()
-            user.email = email
-            user.name = name
-            session.add(user)
+        user = User()
+        user.email = email
+        user.name = name
+        session.add(user)
 
-            session.commit()
-            bar.update(idx)
+        session.commit()
+        # bar.update(idx)
+        bar += 1
 
-    print()
-    sys.stderr.flush()
-    sys.stdout.flush()
+    print(bar)
+    # print()
+    # sys.stderr.flush()
+    # sys.stdout.flush()
 
     session = db_session.create_session()
     return {u.email: u for u in session.query(User)}
@@ -142,17 +151,21 @@ def do_user_import(user_lookup: Dict[str, str]) -> Dict[str, User]:
 def do_import_packages(file_data: List[dict], user_lookup: Dict[str, User]):
     errored_packages = []
     print("Importing packages and releases ... ", flush=True)
-    with progressbar(max_value=len(file_data)) as bar:
-        for idx, p in enumerate(file_data):
-            try:
-                load_package(p, user_lookup)
-                bar.update(idx)
-            except Exception as x:
-                errored_packages.append((p, " *** Errored out for package {}, {}".format(p.get('package_name'), x)))
-                raise
-    sys.stderr.flush()
-    sys.stdout.flush()
-    print()
+    # with progressbar(max_value=len(file_data)) as bar:
+    bar = 0
+    for idx, p in enumerate(file_data):
+        try:
+            load_package(p, user_lookup)
+            # bar.update(idx)
+            bar += 1
+        except Exception as x:
+            errored_packages.append((p, " *** Errored out for package {}, {}".format(p.get('package_name'), x)))
+            raise
+
+    # sys.stderr.flush()
+    # sys.stdout.flush()
+    # print()
+    print(bar)
     print("Completed packages with {} errors.".format(len(errored_packages)))
     for (p, txt) in errored_packages:
         print(txt)
@@ -167,14 +180,17 @@ def do_load_files() -> List[dict]:
     time.sleep(.1)
 
     file_data = []
-    with progressbar(max_value=len(files)) as bar:
-        for idx, f in enumerate(files):
-            file_data.append(load_file_data(f))
-            bar.update(idx)
+    # with progressbar(max_value=len(files)) as bar:
+    bar = 0
+    for idx, f in enumerate(files):
+        file_data.append(load_file_data(f))
+        # bar.update(idx)
+        bar += 1
 
-    sys.stderr.flush()
-    sys.stdout.flush()
-    print()
+    print(bar)
+    # sys.stderr.flush()
+    # sys.stdout.flush()
+    # print()
     return file_data
 
 
@@ -182,18 +198,21 @@ def find_users(data: List[dict]) -> dict:
     print("Discovering users...", flush=True)
     found_users = {}
 
-    with progressbar(max_value=len(data)) as bar:
-        for idx, p in enumerate(data):
-            info = p.get('info')
-            found_users.update(get_email_and_name_from_text(info.get('author'), info.get('author_email')))
-            found_users.update(get_email_and_name_from_text(info.get('maintainer'), info.get('maintainer_email')))
-            bar.update(idx)
+    # with progressbar(max_value=len(data)) as bar:
+    bar = 0
+    for idx, p in enumerate(data):
+        info = p.get('info')
+        found_users.update(get_email_and_name_from_text(info.get('author'), info.get('author_email')))
+        found_users.update(get_email_and_name_from_text(info.get('maintainer'), info.get('maintainer_email')))
+        # bar.update(idx)
+        bar += 1
 
-    sys.stderr.flush()
-    sys.stdout.flush()
-    print()
+    print(bar)
+    # sys.stderr.flush()
+    # sys.stdout.flush()
+    # print()
     print("Discovered {:,} users".format(len(found_users)))
-    print()
+    # print()
 
     return found_users
 

@@ -195,6 +195,7 @@ def do_load_files() -> List[dict]:
 
 
 def find_users(data: List[dict]) -> dict:
+    """ Fetch all the authors and maintainers and their emails from the json dictionaries. Clean it. Output as dict"""
     print("Discovering users...", flush=True)
     found_users = {}
 
@@ -218,6 +219,7 @@ def find_users(data: List[dict]) -> dict:
 
 
 def get_email_and_name_from_text(name: str, email: str) -> dict:
+    """ Cleaning function to get email and name in correct format"""
     data = {}
 
     if not name or not email:
@@ -238,6 +240,7 @@ def get_email_and_name_from_text(name: str, email: str) -> dict:
 
 
 def load_file_data(filename: str) -> dict:
+    """ Reads a json file into an object called data """
     try:
         with open(filename, 'r', encoding='utf-8') as fin:
             data = json.load(fin)
@@ -374,6 +377,7 @@ def init_db():
 
 
 def get_file_names(data_path: str) -> List[str]:
+    """ Creates a list of file paths inside a given directory (at data_path)"""
     files = []
     for f in os.listdir(data_path):
         if f.endswith('.json'):

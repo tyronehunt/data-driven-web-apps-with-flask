@@ -33,4 +33,9 @@ def global_init(db_file: str):
 
 def create_session() -> Session:
     global __factory
+
+    # This is the fix for session has detached / locked
+    session: Session = __factory()
+    session.expire_on_commit = False
+
     return __factory()

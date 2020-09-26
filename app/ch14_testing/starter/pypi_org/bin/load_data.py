@@ -4,12 +4,15 @@ import sys
 import time
 from typing import List, Optional, Dict
 
-import progressbar
+# Progressbar doesn't work
+# import progressbar
 from dateutil.parser import parse
 
+# Adds the directory (two above this file - i.e. starter) to the system path for access outside of PyCharm
 sys.path.insert(0, os.path.abspath(os.path.join(
     os.path.dirname(__file__), "..", "..")))
 
+from pypi_org.infrastructure.num_convert import try_int
 import pypi_org.data.db_session as db_session
 from pypi_org.data.languages import ProgrammingLanguage
 from pypi_org.data.licenses import License
@@ -20,6 +23,11 @@ from pypi_org.data.users import User
 
 
 def main():
+    """
+    Runs the sequence of functions for loading data. Initiates connection to SQLAlchemy db, creates a session,
+    checks if users there (if so closes). Else, loads the users file, imports them, the packages, languages, licenses.
+    Finally summarizes.
+    """
     init_db()
     session = db_session.create_session()
     user_count = session.query(User).count()
@@ -40,61 +48,66 @@ def main():
 def do_import_languages(file_data: List[dict]):
     imported = set()
     print("Importing languages ... ", flush=True)
-    with progressbar.ProgressBar(max_value=len(file_data)) as bar:
-        for idx, p in enumerate(file_data):
-            info = p.get('info')
-            classifiers = info.get('classifiers')
-            for c in classifiers:
-                if 'Programming Language' not in c:
-                    continue
+    # with progressbar(max_value=len(file_data)) as bar:
+    bar = 0
+    for idx, p in enumerate(file_data):
+        info = p.get('info')
+        classifiers = info.get('classifiers')
+        for c in classifiers:
+            if 'Programming Language' not in c:
+                continue
 
-                original = c
+            original = c
 
-                c = c.replace('Implementation ::', '').replace('::', ':')
-                text = c
-                parts = c.split(':')
-                if len(parts) > 1:
-                    text = ' '.join(parts[-2:]).strip().replace('  ', ' ')
+            c = c.replace('Implementation ::', '').replace('::', ':')
+            text = c
+            parts = c.split(':')
+            if len(parts) > 1:
+                text = ' '.join(parts[-2:]).strip().replace('  ', ' ')
 
-                if text not in imported:
-                    imported.add(text)
-                    session = db_session.create_session()
+            if text not in imported:
+                imported.add(text)
+                session = db_session.create_session()
 
-                    lang = ProgrammingLanguage()
-                    lang.description = original
-                    lang.id = text
-                    session.add(lang)
-                    session.commit()
+                lang = ProgrammingLanguage()
+                lang.description = original
+                lang.id = text
+                session.add(lang)
+                session.commit()
+        # bar.update(idx)
+        bar += 1
 
-            bar.update(idx)
-
-    sys.stderr.flush()
-    sys.stdout.flush()
+    print(bar)
+    # sys.stderr.flush()
+    # sys.stdout.flush()
 
 
 def do_import_licenses(file_data: List[dict]):
     imported = set()
     print("Importing licenses ... ", flush=True)
-    with progressbar.ProgressBar(max_value=len(file_data)) as bar:
-        for idx, p in enumerate(file_data):
-            info = p.get('info')
-            license_text = detect_license(info.get('license'))
+    # with progressbar(max_value=len(file_data)) as bar:
+    bar = 0
+    for idx, p in enumerate(file_data):
+        info = p.get('info')
+        license_text = detect_license(info.get('license'))
 
-            if license_text and license_text not in imported:
-                imported.add(license_text)
-                session = db_session.create_session()
+        if license_text and license_text not in imported:
+            imported.add(license_text)
+            session = db_session.create_session()
 
-                package_license = License()
-                package_license.id = license_text
-                package_license.description = info.get('license')
+            package_license = License()
+            package_license.id = license_text
+            package_license.description = info.get('license')
 
-                session.add(package_license)
-                session.commit()
+            session.add(package_license)
+            session.commit()
 
-            bar.update(idx)
+        # bar.update(idx)
+        bar += 1
 
-    sys.stderr.flush()
-    sys.stdout.flush()
+    print(bar)
+    # sys.stderr.flush()
+    # sys.stdout.flush()
 
 
 def do_summary():
@@ -111,22 +124,25 @@ def do_summary():
 
 def do_user_import(user_lookup: Dict[str, str]) -> Dict[str, User]:
     print("Importing users ... ", flush=True)
-    with progressbar.ProgressBar(max_value=len(user_lookup)) as bar:
-        for idx, (email, name) in enumerate(user_lookup.items()):
-            session = db_session.create_session()
-            session.expire_on_commit = False
+    # with progressbar(max_value=len(user_lookup)) as bar:
+    bar = 0
+    for idx, (email, name) in enumerate(user_lookup.items()):
+        session = db_session.create_session()
+        session.expire_on_commit = False
 
-            user = User()
-            user.email = email
-            user.name = name
-            session.add(user)
+        user = User()
+        user.email = email
+        user.name = name
+        session.add(user)
 
-            session.commit()
-            bar.update(idx)
+        session.commit()
+        # bar.update(idx)
+        bar += 1
 
-    print()
-    sys.stderr.flush()
-    sys.stdout.flush()
+    print(bar)
+    # print()
+    # sys.stderr.flush()
+    # sys.stdout.flush()
 
     session = db_session.create_session()
     return {u.email: u for u in session.query(User)}
@@ -135,23 +151,28 @@ def do_user_import(user_lookup: Dict[str, str]) -> Dict[str, User]:
 def do_import_packages(file_data: List[dict], user_lookup: Dict[str, User]):
     errored_packages = []
     print("Importing packages and releases ... ", flush=True)
-    with progressbar.ProgressBar(max_value=len(file_data)) as bar:
-        for idx, p in enumerate(file_data):
-            try:
-                load_package(p, user_lookup)
-                bar.update(idx)
-            except Exception as x:
-                errored_packages.append((p, " *** Errored out for package {}, {}".format(p.get('package_name'), x)))
-                raise
-    sys.stderr.flush()
-    sys.stdout.flush()
-    print()
+    # with progressbar(max_value=len(file_data)) as bar:
+    bar = 0
+    for idx, p in enumerate(file_data):
+        try:
+            load_package(p, user_lookup)
+            # bar.update(idx)
+            bar += 1
+        except Exception as x:
+            errored_packages.append((p, " *** Errored out for package {}, {}".format(p.get('package_name'), x)))
+            raise
+
+    # sys.stderr.flush()
+    # sys.stdout.flush()
+    # print()
+    print(bar)
     print("Completed packages with {} errors.".format(len(errored_packages)))
     for (p, txt) in errored_packages:
         print(txt)
 
 
 def do_load_files() -> List[dict]:
+    # Tab up 5 levels and then into data directory from load_data.py location
     data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../../data/pypi-top-100'))
     print("Loading files from {}".format(data_path))
     files = get_file_names(data_path)
@@ -159,38 +180,46 @@ def do_load_files() -> List[dict]:
     time.sleep(.1)
 
     file_data = []
-    with progressbar.ProgressBar(max_value=len(files)) as bar:
-        for idx, f in enumerate(files):
-            file_data.append(load_file_data(f))
-            bar.update(idx)
+    # with progressbar(max_value=len(files)) as bar:
+    bar = 0
+    for idx, f in enumerate(files):
+        file_data.append(load_file_data(f))
+        # bar.update(idx)
+        bar += 1
 
-    sys.stderr.flush()
-    sys.stdout.flush()
-    print()
+    print(bar)
+    # sys.stderr.flush()
+    # sys.stdout.flush()
+    # print()
     return file_data
 
 
 def find_users(data: List[dict]) -> dict:
+    """ Fetch all the authors and maintainers and their emails from the json dictionaries. Clean it. Output as dict"""
     print("Discovering users...", flush=True)
     found_users = {}
 
-    with progressbar.ProgressBar(max_value=len(data)) as bar:
-        for idx, p in enumerate(data):
-            info = p.get('info')
-            found_users.update(get_email_and_name_from_text(info.get('author'), info.get('author_email')))
-            found_users.update(get_email_and_name_from_text(info.get('maintainer'), info.get('maintainer_email')))
-            bar.update(idx)
+    # with progressbar(max_value=len(data)) as bar:
+    bar = 0
+    for idx, p in enumerate(data):
+        info = p.get('info')
+        found_users.update(get_email_and_name_from_text(info.get('author'), info.get('author_email')))
+        found_users.update(get_email_and_name_from_text(info.get('maintainer'), info.get('maintainer_email')))
+        # bar.update(idx)
+        bar += 1
 
-    sys.stderr.flush()
-    sys.stdout.flush()
-    print()
+    print(bar)
+    # sys.stderr.flush()
+    # sys.stdout.flush()
+    # print()
     print("Discovered {:,} users".format(len(found_users)))
-    print()
+    # print()
 
     return found_users
 
 
 def get_email_and_name_from_text(name: str, email: str) -> dict:
+    """ Cleaning function to get email and name in correct format"""
     data = {}
 
     if not name or not email:
@@ -211,6 +240,7 @@ def get_email_and_name_from_text(name: str, email: str) -> dict:
 
 
 def load_file_data(filename: str) -> dict:
+    """ Reads a json file into an object called data """
     try:
         with open(filename, 'r', encoding='utf-8') as fin:
             data = json.load(fin)
@@ -339,13 +369,6 @@ def make_version_num(version_text):
         return major, minor, build
 
 
-def try_int(text) -> int:
-    try:
-        return int(text)
-    except:
-        return 0
-
-
 def init_db():
     top_folder = os.path.dirname(__file__)
     rel_file = os.path.join('..', 'db', 'pypi.sqlite')
@@ -354,6 +377,7 @@ def init_db():
 
 
 def get_file_names(data_path: str) -> List[str]:
+    """ Creates a list of file paths inside a given directory (at data_path)"""
     files = []
     for f in os.listdir(data_path):
         if f.endswith('.json'):
